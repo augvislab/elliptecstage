@@ -189,4 +189,20 @@ class ElloStage:
 
 
 if __name__ == "__main__":
-    test()
+    import elliptecstage
+
+    # Setup the motor
+    # Connect to the stage
+    stage = elliptecstage.ElloStage()
+
+    # One need to change motor parameters
+    stage.initialize_motor()  # Default values are set
+
+    # initialize the position
+    stage.move_home()
+    command, data, address = stage.read_message_blocking_position_response()
+
+    # Move stage
+    pos = 2.0  # [mm]
+    stage.move_absolute(pos)
+    command, z, address = stage.read_message_blocking_position_response()
