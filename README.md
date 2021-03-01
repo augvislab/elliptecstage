@@ -11,7 +11,7 @@ import elliptecstage
 # Connect to the stage
 stage = elliptecstage.ElloStage()
 
-# One need to change motor parameters
+# One needs to change motor parameters
 stage.initialize_motor() # Default values are set
 
 # initialize the position
