@@ -138,4 +138,6 @@ setup(
     cmdclass={
         'upload': UploadCommand,
     },
+    setup_requires=["pytest-runner"],
+    tests_require=["pytest", "pytest-cov"],
 )

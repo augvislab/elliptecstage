@@ -1,5 +1,5 @@
 import pytest
-from src.elliptecstage import ElloHostCommands, ElloStage, ElloDeviceResponses
+from elliptecstage.elliptecstage import ElloHostCommands, ElloStage, ElloDeviceResponses
 
 
 class TestClass(object):
