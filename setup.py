@@ -16,7 +16,7 @@ setup(
     license="Apache License 2.0",
     description="Python module to control Elliptec Linear Translation Stage with Resonant Piezoelectric Motors",
     author="Yuta Itoh",
-    url="",
+    url="https://github.com/augvislab/elliptec_stage",
     packages=find_packages("src"),
     package_dir={"": "src"},
     py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
