@@ -1,4 +1,3 @@
-# elliptec_stage
 A python class for Elliptec's linear stages from Thorlabs.
 
 ## Installation
