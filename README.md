@@ -1,2 +1,5 @@
 # elliptec_stage
-A serial communication class for Elliptec's linear stages from Thorlabs.
+A python class for Elliptec's linear stages from Thorlabs.
+
+## Installation
+``` pip install git+https://github.com/augvislab/elliptec_stage ```
