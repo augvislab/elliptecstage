@@ -25,3 +25,6 @@ command, z, address = stage.read_message_blocking_position_response()
 print('Measured position: ' + str(z))
 
 ```
+
+## Resources
+[**Communications Protocol**](https://www.thorlabs.de/Software/Elliptec/Communications_Protocol/ELLx%20modules%20protocol%20manual.pdf) from Thorlabs' website.
