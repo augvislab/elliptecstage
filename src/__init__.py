@@ -7,7 +7,7 @@ Stage with Resonant Piezoelectric Motors
 """
 import serial
 from enum import Enum
-import src.module
+import src.elliptecstage
 
 version_info = 0, 1, 0
 __version__ = '.'.join(map(str, version_info))
