@@ -33,7 +33,7 @@ class TestClass(object):
         assert ElloDeviceResponses._DEVGET_INVALID == command
 
     def test_parse_message_valid_input(self):
-        msg = b'0PO00002000'
-        command, data, address = ElloDeviceResponses.parse_message(msg)
+        byte_msg = b'0PO00002000'
+        command, data, address = ElloDeviceResponses.parse_message(byte_msg)
         assert (ElloDeviceResponses._DEVGET_POSITION,
                 4.0, 0) == (command, data, address)
