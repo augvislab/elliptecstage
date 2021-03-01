@@ -26,6 +26,7 @@ EMAIL = ''
 AUTHOR = 'Yuta Itoh'
 REQUIRES_PYTHON = '>=3.6.0'
 VERSION = '0.1.0'
+KEYWORDS = ['elliptec', 'thorlabs', 'linear stage' ],
 
 # What packages are required for this module to be executed?
 REQUIRED = _requires_from_file('requirements.txt')
