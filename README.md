@@ -22,5 +22,6 @@ command, data, address = stage.read_message_blocking_position_response()
 pos = 2.0 # [mm]
 stage.move_absolute(pos)
 command, z, address = stage.read_message_blocking_position_response()
+print('Measured position: ' + str(z))
 
 ```
