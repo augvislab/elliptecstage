@@ -21,7 +21,7 @@ from enum import Enum
 class ElloDeviceUtility(Enum):
     @classmethod
     def position(self, data):
-        return ElloStage.puls_8byte_hex_str_to_mm(data)
+        return ElloStage.puls_hex_str_to_mm(data)
 
     @classmethod
     def undefined(self, data):
@@ -55,6 +55,7 @@ class ElloDeviceResponses(tuple, Enum):
         if len(msg) < 5:  # device reply is at least 5bytes
             return ElloDeviceResponses._DEVGET_INVALID, '', -1
 
+        # Parse the message
         address = int(chr(msg[0]))
         command_id = msg[1:3]
         data = msg[3:len(msg)]  # truncate /r/n
@@ -108,6 +109,7 @@ class ElloHostCommands(Enum):
 
 class ElloStage:
     _PULS_PER_MM = 2048
+    _STAGE_MAX = 60.0
 
     # Initialize the connection with the motor
     def __init__(self, port='COM3', n=0):
@@ -118,22 +120,39 @@ class ElloStage:
         self.initialize_motor()
 
     # Convert a position to 8bytes hex string in upper cases
-    # Ello devices are case sensitive
     @classmethod
     def mm_to_pulse_8byte_hex_str(self, pos):
-        hex_str = format(round(pos * 2048), '08X')
+        val = round(pos * self._PULS_PER_MM)
+        hex_str = self.int2dword(val)
         return hex_str
 
     @classmethod
-    def puls_8byte_hex_str_to_mm(self, hex_str):
-        pos = int(hex_str, 16)/self._PULS_PER_MM
+    def puls_hex_str_to_mm(self, hex_str):
+        pos = int(hex_str, 16)/self._PULS_PER_MM  # [mm]
         return pos
+
+    @classmethod
+    def int2word(self, val: int):
+        assert(0 <= val <= 65535)
+        # Due to the protocol, X must be in upper case
+        hex_str = format(val, '04X')  # Hex length 4
+        return hex_str
+
+    @classmethod
+    def int2dword(self, val: int):
+        assert(0 <= val <= 4294967295)
+        # Due to the protocol, X must be in upper case
+        hex_str = format(val, '08X')  # Hex legnth 8
+        return hex_str
 
     def read_message(self):
         msg = self._stage.readline()
-        msg = msg.strip()
+        msg = msg.strip()  # remove \r\n
         return msg
 
+    # Keep reading messages from the motor until it returns
+    # a trigger command. The default trigger is
+    # ElloDeviceResponses._DEVGET_STATUS
     def read_message_blocking(self,
                               trigger_command=ElloDeviceResponses._DEVGET_STATUS,
                               timeout_trial=5):
@@ -163,11 +182,36 @@ class ElloStage:
         self._stage.write(raw_command.encode())
 
     def initialize_motor(self):
-        self.send_command(ElloHostCommands._HOSTSET_FWP_MOTOR1, '00B7')
-        self.send_command(ElloHostCommands._HOSTSET_BWP_MOTOR1, '008D')
-        self.send_command(ElloHostCommands._HOSTSET_FWP_MOTOR2, '00B3')
-        self.send_command(ElloHostCommands._HOSTSET_BWP_MOTOR2, '008B')
+        motor1_forward__period = 183  # kHz
+        motor1_backward_period = 141  # kHz
+        motor2_forward__period = 179  # kHz
+        motor2_backward_period = 139  # kHz
+        self.set_motor1_frequency(motor1_forward__period,
+                                  motor1_backward_period)
+        self.set_motor2_frequency(motor2_forward__period,
+                                  motor2_backward_period)
         self.send_command(ElloHostCommands._HOSTSET_VELOCITY, '64')
+
+    def set_motor1_frequency(self,
+                             motor1_forward__period,
+                             motor1_backward_period):
+        m1_fwp_hex = self.int2word(motor1_forward__period)
+        m1_bwp_hex = self.int2word(motor1_backward_period)
+        ####
+        # A weird specification by the protocol
+        m1_fwp_hex[0] = '8'
+        m1_bwp_hex[0] = '8'
+        ####
+        self.send_command(ElloHostCommands._HOSTSET_FWP_MOTOR1, m1_fwp_hex)
+        self.send_command(ElloHostCommands._HOSTSET_BWP_MOTOR1, m1_bwp_hex)
+
+    def set_motor2_frequency(self,
+                             motor2_forward__period,
+                             motor2_backward_period):
+        m2_fwp_hex = self.int2word(motor2_forward__period)
+        m2_bwp_hex = self.int2word(motor2_backward_period)
+        self.send_command(ElloHostCommands._HOSTSET_FWP_MOTOR1, m2_fwp_hex)
+        self.send_command(ElloHostCommands._HOSTSET_BWP_MOTOR1, m2_bwp_hex)
 
     def get_motor1info(self):
         self.send_command(ElloHostCommands._HOSTREQ_MOTOR1INFO)
