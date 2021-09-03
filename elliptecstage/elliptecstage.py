@@ -115,8 +115,9 @@ class ElloStage:
     def __init__(self, port='COM3', n=0):
         # start serial on _stage
         self._stage = serial.Serial(port=port, baudrate=9600, timeout=0.2)
+        assert n < 16
         self._n = n
-        self._n_str = str(n)
+        self._n_str = format(n, '01X')
         self.initialize_motor()
 
     # Convert a position to 8bytes hex string in upper cases
