@@ -112,9 +112,9 @@ class ElloStage:
     _STAGE_MAX = 60.0
 
     # Initialize the connection with the motor
-    def __init__(self, port='COM3', n=0):
+    def __init__(self, com, n=0):
         # start serial on _stage
-        self._stage = serial.Serial(port=port, baudrate=9600, timeout=0.2)
+        self._stage = com
         assert n < 16
         self._n = n
         self._n_str = format(n, '01X')
@@ -238,7 +238,8 @@ if __name__ == "__main__":
 
     # Setup the motor
     # Connect to the stage
-    stage = elliptecstage.ElloStage()
+    com = serial.Serial(port='COM3', baudrate=9600, timeout=0.2)
+    stage = elliptecstage.ElloStage(com, 0)
 
     # One need to change motor parameters
     stage.initialize_motor()  # Default values are set
