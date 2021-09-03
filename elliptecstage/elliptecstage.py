@@ -175,7 +175,7 @@ class ElloStage:
         return self.read_message_blocking(trigger_command=ElloDeviceResponses._DEVGET_POSITION)
 
     def send_command(self, ello_command, value=''):
-        command = ello_command.compose_command(value)
+        command = ello_command.compose_command(value, self._n_str)
         self._stage.write(command.encode())
 
     def raw_command(self, raw_command):
