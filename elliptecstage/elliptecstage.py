@@ -112,11 +112,12 @@ class ElloStage:
     _STAGE_MAX = 60.0
 
     # Initialize the connection with the motor
-    def __init__(self, port='COM3', n=0):
+    def __init__(self, com, n=0):
         # start serial on _stage
-        self._stage = serial.Serial(port=port, baudrate=9600, timeout=0.2)
+        self._stage = com
+        assert n < 16
         self._n = n
-        self._n_str = str(n)
+        self._n_str = format(n, '01X')
         self.initialize_motor()
 
     # Convert a position to 8bytes hex string in upper cases
@@ -175,7 +176,7 @@ class ElloStage:
         return self.read_message_blocking(trigger_command=ElloDeviceResponses._DEVGET_POSITION)
 
     def send_command(self, ello_command, value=''):
-        command = ello_command.compose_command(value)
+        command = ello_command.compose_command(value, self._n_str)
         self._stage.write(command.encode())
 
     def raw_command(self, raw_command):
@@ -233,20 +234,21 @@ class ElloStage:
 
 
 if __name__ == "__main__":
-    import elliptecstage
-
     # Setup the motor
     # Connect to the stage
-    stage = elliptecstage.ElloStage()
-
-    # One need to change motor parameters
-    stage.initialize_motor()  # Default values are set
-
-    # initialize the position
-    stage.move_home()
-    command, data, address = stage.read_message_blocking_position_response()
-
-    # Move stage
-    pos = 2.0  # [mm]
-    stage.move_absolute(pos)
-    command, z, address = stage.read_message_blocking_position_response()
+    with serial.Serial(port='COM3', baudrate=9600, timeout=0.2) as com:
+        stage = ElloStage(com, 0)
+        
+        # One need to change motor parameters
+        stage.initialize_motor()  # Default values are set
+        
+        # initialize the position
+        stage.move_home()
+        command, data, address = stage.read_message_blocking_position_response()
+        print(f'{command}\t{data}\t{address}')
+        
+        # Move stage
+        pos = 2.0  # [mm]
+        stage.move_absolute(pos)
+        command, z, address = stage.read_message_blocking_position_response()
+        print(f'{command}\t{z}\t{address}')
