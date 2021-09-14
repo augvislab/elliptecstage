@@ -234,21 +234,21 @@ class ElloStage:
 
 
 if __name__ == "__main__":
-    import elliptecstage
-
     # Setup the motor
     # Connect to the stage
-    com = serial.Serial(port='COM3', baudrate=9600, timeout=0.2)
-    stage = elliptecstage.ElloStage(com, 0)
-
-    # One need to change motor parameters
-    stage.initialize_motor()  # Default values are set
-
-    # initialize the position
-    stage.move_home()
-    command, data, address = stage.read_message_blocking_position_response()
-
-    # Move stage
-    pos = 2.0  # [mm]
-    stage.move_absolute(pos)
-    command, z, address = stage.read_message_blocking_position_response()
+    with serial.Serial(port='COM3', baudrate=9600, timeout=0.2) as com:
+        stage = ElloStage(com, 0)
+        
+        # One need to change motor parameters
+        stage.initialize_motor()  # Default values are set
+        
+        # initialize the position
+        stage.move_home()
+        command, data, address = stage.read_message_blocking_position_response()
+        print(f'{command}\t{data}\t{address}')
+        
+        # Move stage
+        pos = 2.0  # [mm]
+        stage.move_absolute(pos)
+        command, z, address = stage.read_message_blocking_position_response()
+        print(f'{command}\t{z}\t{address}')
