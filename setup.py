@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # This setup.py is adopted from https://github.com/navdeep-G/setup.py
@@ -23,9 +23,9 @@ NAME = 'elliptecstage'
 DESCRIPTION = 'Python module to control Elliptec Linear Translation Stage with Resonant Piezoelectric Motors.'
 URL = 'https://github.com/augvislab/elliptec_stage'
 EMAIL = ''
-AUTHOR = 'Yuta Itoh'
+AUTHOR = 'Yuta Itoh, Émile Jetzer'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.1.0'
+VERSION = '0.1.1'
 KEYWORDS = ['elliptec', 'thorlabs', 'linear stage' ],
 
 # What packages are required for this module to be executed?
