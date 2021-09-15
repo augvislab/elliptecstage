@@ -159,18 +159,16 @@ class ElloStage:
                               timeout_trial=5):
         if timeout_trial < 0:
             timeout_trial = 0
-        count = 0
-        while True:
+
+        for count in range(timeout_trial + 1):
             msg = self.read_message()
             command, data, address = ElloDeviceResponses.parse_message(msg)
 
             # Check if the device response is desirable one
             if command is trigger_command:
                 return command, data, address
-
-            count = count+1
-            if count > timeout_trial:
-                return ElloDeviceResponses._DEVGET_INVALID, data, address
+        else:
+            return ElloDeviceResponses._DEVGET_INVALID, data, address
 
     def read_message_blocking_position_response(self):
         return self.read_message_blocking(trigger_command=ElloDeviceResponses._DEVGET_POSITION)
