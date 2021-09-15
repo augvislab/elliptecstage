@@ -17,6 +17,41 @@ from enum import Enum
 # 13 # Over Current error
 # 14 # General error. Applicable only to Motorized Paddle Polarizer
 
+class ElloException(Exception):
+    messages = {1: 'Communication time out',
+                2: 'Mechanical time out',
+                3: 'Command error or not supported',
+                4: 'Value out of range',
+                5: 'Module isolated',
+                6: 'Module out of isolation',
+                7: 'Initializing error',
+                8: 'Thermal error',
+                9: 'Busy',
+                10: 'Sensor Error (May appear during self test. If code persists there is an error)',
+                11: 'Motor Error (May appear during self test. If code persists there is an error)',
+                12: 'Out of Range (e.g. _stage has been instructed to move beyond its travel range).',
+                13: 'Over Current error',
+                14: 'General error. Applicable only to Motorized Paddle Polarizer'}
+    
+    def __init__(self, code):
+        msg = ElloException.messages.get(code, None)
+        super().__init__(f'Error {code} ({msg}).')
+
+
+
+class ElloInvalidResponse(ElloException):
+
+    def __init__(self, reply):
+        super().__init__(f'Reply {reply!r} could not be matched to any known reply.')
+
+
+
+class ElloReplyTooShort(ElloInvalidResponse):
+
+    def __init__(self, reply):
+        super(type(self).__bases__[0], self).__init__(f'Reply {reply!r} with length {len(reply)} is too short, should be at least 5 bytes.')
+
+
 
 class ElloDeviceUtility(Enum):
     @classmethod
@@ -53,7 +88,7 @@ class ElloDeviceResponses(tuple, Enum):
     @staticmethod
     def parse_message(msg):
         if len(msg) < 5:  # device reply is at least 5bytes
-            return ElloDeviceResponses._DEVGET_INVALID, '', -1
+            raise ElloReplyTooShort(msg)
 
         # Parse the message
         address = int(chr(msg[0]))
@@ -65,13 +100,15 @@ class ElloDeviceResponses(tuple, Enum):
             if command[0] == command_id:
                 data = command[1](data.decode())
                 return command, data, address
+        else:
+            raise ElloInvalidResponse(msg)
 
         return ElloDeviceResponses._DEVGET_INVALID, data, address
 
 
 class ElloHostCommands(Enum):
     _HOSTREQ_STATUS = 'gs'
-    # _HOSTREQ_INFORMATION = 'in'_DEV
+    _HOSTREQ_INFORMATION = 'in'
     _HOSTREQ_SAVE_USER_DATA = 'us'
     _HOSTREQ_CHANGEADDRESS = 'ca'
     _HOSTREQ_MOTOR1INFO = 'i1'
@@ -119,6 +156,7 @@ class ElloStage:
         self._n = n
         self._n_str = format(n, '01X')
         self.initialize_motor()
+        self.info = self.send_command(ElloHostCommands._HOSTREQ_INFORMATION)
 
     # Convert a position to 8bytes hex string in upper cases
     @classmethod
@@ -168,7 +206,7 @@ class ElloStage:
             if command is trigger_command:
                 return command, data, address
         else:
-            return ElloDeviceResponses._DEVGET_INVALID, data, address
+            raise ElloInvalidResponse(msg)
 
     def read_message_blocking_position_response(self):
         return self.read_message_blocking(trigger_command=ElloDeviceResponses._DEVGET_POSITION)
@@ -237,8 +275,8 @@ if __name__ == "__main__":
     with serial.Serial(port='COM3', baudrate=9600, timeout=0.2) as com:
         stage = ElloStage(com, 0)
         
-        # One need to change motor parameters
-        stage.initialize_motor()  # Default values are set
+        # Display the info of the motor
+        print(stage.info)
         
         # initialize the position
         stage.move_home()
