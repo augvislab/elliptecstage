@@ -1,4 +1,5 @@
 import serial
+import chardet
 from enum import Enum
 
 
@@ -56,7 +57,7 @@ class ElloReplyTooShort(ElloInvalidResponse):
 class ElloDeviceUtility(Enum):
     @classmethod
     def position(self, data):
-        return ElloStage.puls_hex_str_to_mm(data)
+        return ElloStage.pulse_hex_str_to_mm(data)
 
     @classmethod
     def undefined(self, data):
@@ -98,12 +99,14 @@ class ElloDeviceResponses(tuple, Enum):
         # Search for command
         for command in ElloDeviceResponses:
             if command[0] == command_id:
-                data = command[1](data.decode())
+                try:
+                    encoding = chardet.detect(data)['encoding']
+                    data = command[1](data.decode(encoding=encoding))
+                except UnicodeError as e:
+                    raise ElloInvalidResponse(data) from e
                 return command, data, address
         else:
             raise ElloInvalidResponse(msg)
-
-        return ElloDeviceResponses._DEVGET_INVALID, data, address
 
 
 class ElloHostCommands(Enum):
@@ -160,25 +163,25 @@ class ElloStage:
 
     # Convert a position to 8bytes hex string in upper cases
     @classmethod
-    def mm_to_pulse_8byte_hex_str(self, pos):
-        val = round(pos * self._PULS_PER_MM)
-        hex_str = self.int2dword(val)
+    def mm_to_pulse_8byte_hex_str(cls, pos):
+        val = round(pos * cls._PULS_PER_MM)
+        hex_str = cls.int2dword(val)
         return hex_str
 
     @classmethod
-    def puls_hex_str_to_mm(self, hex_str):
-        pos = int(hex_str, 16)/self._PULS_PER_MM  # [mm]
+    def pulse_hex_str_to_mm(cls, hex_str):
+        pos = int(hex_str, 16)/cls._PULS_PER_MM  # [mm]
         return pos
 
     @classmethod
-    def int2word(self, val: int):
+    def int2word(cls, val: int):
         assert(0 <= val <= 65535)
         # Due to the protocol, X must be in upper case
         hex_str = format(val, '04X')  # Hex length 4
         return hex_str
 
     @classmethod
-    def int2dword(self, val: int):
+    def int2dword(cls, val: int):
         assert(0 <= val <= 4294967295)
         # Due to the protocol, X must be in upper case
         hex_str = format(val, '08X')  # Hex legnth 8
@@ -236,8 +239,8 @@ class ElloStage:
         m1_bwp_hex = self.int2word(motor1_backward_period)
         ####
         # A weird specification by the protocol
-        m1_fwp_hex[0] = '8'
-        m1_bwp_hex[0] = '8'
+        m1_fwp_hex = '8' + m1_fwp_hex[1:]
+        m1_bwp_hex = '8' + m1_bwp_hex[1:]
         ####
         self.send_command(ElloHostCommands._HOSTSET_FWP_MOTOR1, m1_fwp_hex)
         self.send_command(ElloHostCommands._HOSTSET_BWP_MOTOR1, m1_bwp_hex)
@@ -257,11 +260,11 @@ class ElloStage:
         self.send_command(ElloHostCommands._HOSTREQ_MOTOR2INFO)
 
     def move_absolute(self, pos):
-        value = self.mm_to_puls_8byte_hex_str(pos)
+        value = type(self).mm_to_pulse_8byte_hex_str(pos)
         self.send_command(ElloHostCommands._HOSTREQ_MOVEABSOLUTE, value)
 
     def move_relative(self, pos):
-        value = self.mm_to_puls_8byte_hex_str(pos)
+        value = type(self).mm_to_pulse_8byte_hex_str(pos)
         self.send_command(ElloHostCommands._HOSTREQ_MOVERELATIVE, value)
 
     def move_home(self):
