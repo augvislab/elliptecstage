@@ -1,4 +1,5 @@
 import serial
+import chardet
 from enum import Enum
 
 
@@ -17,11 +18,46 @@ from enum import Enum
 # 13 # Over Current error
 # 14 # General error. Applicable only to Motorized Paddle Polarizer
 
+class ElloException(Exception):
+    messages = {1: 'Communication time out',
+                2: 'Mechanical time out',
+                3: 'Command error or not supported',
+                4: 'Value out of range',
+                5: 'Module isolated',
+                6: 'Module out of isolation',
+                7: 'Initializing error',
+                8: 'Thermal error',
+                9: 'Busy',
+                10: 'Sensor Error (May appear during self test. If code persists there is an error)',
+                11: 'Motor Error (May appear during self test. If code persists there is an error)',
+                12: 'Out of Range (e.g. _stage has been instructed to move beyond its travel range).',
+                13: 'Over Current error',
+                14: 'General error. Applicable only to Motorized Paddle Polarizer'}
+    
+    def __init__(self, code):
+        msg = ElloException.messages.get(code, None)
+        super().__init__(f'Error {code} ({msg}).')
+
+
+
+class ElloInvalidResponse(ElloException):
+
+    def __init__(self, reply):
+        super().__init__(f'Reply {reply!r} could not be matched to any known reply.')
+
+
+
+class ElloReplyTooShort(ElloInvalidResponse):
+
+    def __init__(self, reply):
+        super(type(self).__bases__[0], self).__init__(f'Reply {reply!r} with length {len(reply)} is too short, should be at least 5 bytes.')
+
+
 
 class ElloDeviceUtility(Enum):
     @classmethod
     def position(self, data):
-        return ElloStage.puls_hex_str_to_mm(data)
+        return ElloStage.pulse_hex_str_to_mm(data)
 
     @classmethod
     def undefined(self, data):
@@ -53,7 +89,7 @@ class ElloDeviceResponses(tuple, Enum):
     @staticmethod
     def parse_message(msg):
         if len(msg) < 5:  # device reply is at least 5bytes
-            return ElloDeviceResponses._DEVGET_INVALID, '', -1
+            raise ElloReplyTooShort(msg)
 
         # Parse the message
         address = int(chr(msg[0]))
@@ -63,15 +99,19 @@ class ElloDeviceResponses(tuple, Enum):
         # Search for command
         for command in ElloDeviceResponses:
             if command[0] == command_id:
-                data = command[1](data.decode())
+                try:
+                    encoding = chardet.detect(data)['encoding']
+                    data = command[1](data.decode(encoding=encoding))
+                except UnicodeError as e:
+                    raise ElloInvalidResponse(data) from e
                 return command, data, address
-
-        return ElloDeviceResponses._DEVGET_INVALID, data, address
+        else:
+            raise ElloInvalidResponse(msg)
 
 
 class ElloHostCommands(Enum):
     _HOSTREQ_STATUS = 'gs'
-    # _HOSTREQ_INFORMATION = 'in'_DEV
+    _HOSTREQ_INFORMATION = 'in'
     _HOSTREQ_SAVE_USER_DATA = 'us'
     _HOSTREQ_CHANGEADDRESS = 'ca'
     _HOSTREQ_MOTOR1INFO = 'i1'
@@ -119,28 +159,29 @@ class ElloStage:
         self._n = n
         self._n_str = format(n, '01X')
         self.initialize_motor()
+        self.info = self.send_command(ElloHostCommands._HOSTREQ_INFORMATION)
 
     # Convert a position to 8bytes hex string in upper cases
     @classmethod
-    def mm_to_pulse_8byte_hex_str(self, pos):
-        val = round(pos * self._PULS_PER_MM)
-        hex_str = self.int2dword(val)
+    def mm_to_pulse_8byte_hex_str(cls, pos):
+        val = round(pos * cls._PULS_PER_MM)
+        hex_str = cls.int2dword(val)
         return hex_str
 
     @classmethod
-    def puls_hex_str_to_mm(self, hex_str):
-        pos = int(hex_str, 16)/self._PULS_PER_MM  # [mm]
+    def pulse_hex_str_to_mm(cls, hex_str):
+        pos = int(hex_str, 16)/cls._PULS_PER_MM  # [mm]
         return pos
 
     @classmethod
-    def int2word(self, val: int):
+    def int2word(cls, val: int):
         assert(0 <= val <= 65535)
         # Due to the protocol, X must be in upper case
         hex_str = format(val, '04X')  # Hex length 4
         return hex_str
 
     @classmethod
-    def int2dword(self, val: int):
+    def int2dword(cls, val: int):
         assert(0 <= val <= 4294967295)
         # Due to the protocol, X must be in upper case
         hex_str = format(val, '08X')  # Hex legnth 8
@@ -159,18 +200,16 @@ class ElloStage:
                               timeout_trial=5):
         if timeout_trial < 0:
             timeout_trial = 0
-        count = 0
-        while True:
+
+        for count in range(timeout_trial + 1):
             msg = self.read_message()
             command, data, address = ElloDeviceResponses.parse_message(msg)
 
             # Check if the device response is desirable one
             if command is trigger_command:
                 return command, data, address
-
-            count = count+1
-            if count > timeout_trial:
-                return ElloDeviceResponses._DEVGET_INVALID, data, address
+        else:
+            raise ElloInvalidResponse(msg)
 
     def read_message_blocking_position_response(self):
         return self.read_message_blocking(trigger_command=ElloDeviceResponses._DEVGET_POSITION)
@@ -200,8 +239,8 @@ class ElloStage:
         m1_bwp_hex = self.int2word(motor1_backward_period)
         ####
         # A weird specification by the protocol
-        m1_fwp_hex[0] = '8'
-        m1_bwp_hex[0] = '8'
+        m1_fwp_hex = '8' + m1_fwp_hex[1:]
+        m1_bwp_hex = '8' + m1_bwp_hex[1:]
         ####
         self.send_command(ElloHostCommands._HOSTSET_FWP_MOTOR1, m1_fwp_hex)
         self.send_command(ElloHostCommands._HOSTSET_BWP_MOTOR1, m1_bwp_hex)
@@ -221,11 +260,11 @@ class ElloStage:
         self.send_command(ElloHostCommands._HOSTREQ_MOTOR2INFO)
 
     def move_absolute(self, pos):
-        value = self.mm_to_puls_8byte_hex_str(pos)
+        value = type(self).mm_to_pulse_8byte_hex_str(pos)
         self.send_command(ElloHostCommands._HOSTREQ_MOVEABSOLUTE, value)
 
     def move_relative(self, pos):
-        value = self.mm_to_puls_8byte_hex_str(pos)
+        value = type(self).mm_to_pulse_8byte_hex_str(pos)
         self.send_command(ElloHostCommands._HOSTREQ_MOVERELATIVE, value)
 
     def move_home(self):
@@ -239,8 +278,8 @@ if __name__ == "__main__":
     with serial.Serial(port='COM3', baudrate=9600, timeout=0.2) as com:
         stage = ElloStage(com, 0)
         
-        # One need to change motor parameters
-        stage.initialize_motor()  # Default values are set
+        # Display the info of the motor
+        print(stage.info)
         
         # initialize the position
         stage.move_home()
